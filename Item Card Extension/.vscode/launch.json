@@ -1,0 +1,47 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "DEV",
+            "request": "launch",
+            "type": "al",
+            "tenant": "93e723e3-01e7-4e97-99cf-13ddd492ed98",
+            "environmentType": "Sandbox",
+            "environmentName": "DEV",
+            "startupObjectId": 30,
+            "startupObjectType": "Page",
+            "breakOnError": "All",
+            "launchBrowser": false,
+            "enableLongRunningSqlStatements": true,
+            "enableSqlInformationDebugger": true
+        },
+        {
+            "name": "AMA_HIST",
+            "request": "launch",
+            "type": "al",
+            "tenant": "93e723e3-01e7-4e97-99cf-13ddd492ed98",
+            "environmentType": "Sandbox",
+            "environmentName": "AMA_HIST",
+            "startupObjectId": 30,
+            "startupObjectType": "Page",
+            "breakOnError": "All",
+            "launchBrowser": false,
+            "enableLongRunningSqlStatements": true,
+            "enableSqlInformationDebugger": true
+        },
+        {
+            "name": "AMA",
+            "request": "launch",
+            "type": "al",
+            "tenant": "93e723e3-01e7-4e97-99cf-13ddd492ed98",
+            "environmentType": "Sandbox",
+            "environmentName": "AMA",
+            "startupObjectId": 30,
+            "startupObjectType": "Page",
+            "breakOnError": "All",
+            "launchBrowser": false,
+            "enableLongRunningSqlStatements": true,
+            "enableSqlInformationDebugger": true
+        }
+    ]
+}

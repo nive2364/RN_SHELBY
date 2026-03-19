@@ -1,0 +1,16 @@
+{
+    "al.enableCodeAnalysis": true,
+    "al.codeAnalyzers": [
+        "${CodeCop}",
+        "${PerTenantExtensionCop}",
+        "${UICop}"
+    ],
+    "al.packageCachePath": ".alpackages",
+    "al.backgroundCodeAnalysis": true,
+    "al.enableCodeActions": true,
+    "files.exclude": {
+        "**/.alpackages": true,
+        "**/.vscode": true
+    },
+    "al.showHomeAtStartup": "WhenUpdated"
+}

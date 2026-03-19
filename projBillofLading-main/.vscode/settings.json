@@ -1,0 +1,27 @@
+{
+    "sqltools.connections": [
+        {
+            "mssqlOptions": {
+                "appName": "SQLTools",
+                "useUTC": true,
+                "encrypt": true
+            },
+            "previewLimit": 50,
+            "server": "172.190.148.155",
+            "port": 1433,
+            "driver": "MSSQL",
+            "name": "CANYONRIM-SQL",
+            "database": "master",
+            "username": "sa2",
+            "password": "xG6odujeCqytrD"
+        },
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "test sql lite",
+            "database": "/Users/drew/Documents/sqllite/test.db"
+        }
+    ],
+    "sqltools.useNodeRuntime": true,
+    "al.showHomeAtStartup": "Always"
+}
