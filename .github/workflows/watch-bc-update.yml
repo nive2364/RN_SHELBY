@@ -1,0 +1,83 @@
+name: Watch for BC Update
+
+on:
+  schedule:
+    - cron: '0 10 * * *'
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check BC version and trigger deploy if updated
+        shell: bash
+        env:
+          BC_USERNAME: ${{ secrets.BC_USERNAME }}
+          BC_PASSWORD: ${{ secrets.BC_PASSWORD }}
+          BC_TENANT_ID: 93e723e3-01e7-4e97-99cf-13ddd492ed98
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "BC Update Watcher - $(date -u)"
+
+          BC_ADMIN_APP_ID="996def3d-b36c-4153-8607-a6fd3c01b89f"
+
+          TOKEN=$(curl -s -X POST \
+            "https://login.microsoftonline.com/${BC_TENANT_ID}/oauth2/v2.0/token" \
+            -d "grant_type=password" \
+            -d "client_id=${BC_ADMIN_APP_ID}" \
+            -d "username=${BC_USERNAME}" \
+            -d "password=${BC_PASSWORD}" \
+            -d "scope=https://api.businesscentral.dynamics.com/.default" \
+            | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "ERROR: Authentication failed."
+            exit 1
+          fi
+
+          BASE="https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT_ID}/admin/v2.21/applications/BusinessCentral/environments"
+          CACHE_DIR=".github/bc-version-cache"
+          mkdir -p "$CACHE_DIR"
+          DEPLOY_NEEDED=false
+
+          for ENV_NAME in DEV AMA_HIST AMA; do
+            CURRENT=$(curl -s "$BASE/$ENV_NAME" \
+              -H "Authorization: Bearer $TOKEN" | jq -r '.applicationVersion')
+            CACHE_FILE="$CACHE_DIR/$ENV_NAME.txt"
+            LAST=$(cat "$CACHE_FILE" 2>/dev/null | tr -d '[:space:]' || echo "")
+            echo "$ENV_NAME - cached: ${LAST:-none}  current: $CURRENT"
+            if [ "$CURRENT" != "$LAST" ]; then
+              echo "  Updated: $ENV_NAME ($LAST -> $CURRENT)"
+              echo "$CURRENT" > "$CACHE_FILE"
+              DEPLOY_NEEDED=true
+            fi
+          done
+
+          if [ "$DEPLOY_NEEDED" = "true" ]; then
+            curl -s -X POST \
+              "https://api.github.com/repos/nive2364/RN_SHELBY/actions/workflows/deploy-on-bc-update.yml/dispatches" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"ref":"main"}'
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$CACHE_DIR/"
+            git commit -m "chore: BC version cache updated [skip ci]"
+            git push
+          else
+            echo "No BC updates detected."
+            SCHEDULED=$(curl -s "$BASE/DEV/updates" \
+              -H "Authorization: Bearer $TOKEN" \
+              | jq -r '.value[] | select(.selected==true) | .scheduleDetails.selectedDateTime // empty')
+            TARGET=$(curl -s "$BASE/DEV/updates" \
+              -H "Authorization: Bearer $TOKEN" \
+              | jq -r '.value[] | select(.selected==true) | .targetVersion // empty')
+            [ -n "$SCHEDULED" ] && echo "Next: $TARGET on $SCHEDULED" || echo "No update scheduled."
+          fi
