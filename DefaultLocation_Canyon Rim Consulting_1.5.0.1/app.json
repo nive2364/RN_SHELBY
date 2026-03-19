@@ -1,0 +1,30 @@
+{
+  "id": "87064380-af52-47ab-9167-c06796aef4b9",
+  "name": "DefaultLocation",
+  "publisher": "Canyon Rim Consulting",
+  "version": "1.5.0.1",
+  "runtime": "13.0",
+  "target": "Cloud",
+  "application": "26.0.0.0",
+  "platform": "26.0.44919.0",
+  "resourceExposurePolicy": {
+    "allowDebugging": true,
+    "allowDownloadingSource": true,
+    "includeSourceInSymbolFile": true,
+    "applyToDevExtension": false
+  },
+  "features": [
+    "NOIMPLICITWITH"
+  ],
+  "idRanges": [
+    {
+      "from": 50200,
+      "to": 50249
+    }
+  ],
+  "build": {
+    "by": "AL Language Extension,15.0.1433841",
+    "timestamp": "2025-10-18T15:47:49.5400040+00:00",
+    "compilerVersion": "15.2.24.57679"
+  }
+}
