@@ -7,6 +7,10 @@ on:
         description: 'BC version that triggered this deployment'
         required: false
         default: 'manual'
+      environment:
+        description: 'Environment to deploy to (DEV, AMA_HIST, AMA, or ALL)'
+        required: false
+        default: 'ALL'
 
 permissions:
   contents: write
@@ -24,17 +28,19 @@ jobs:
         run: |
           Install-Module BcContainerHelper -Force -AllowClobber -Scope CurrentUser
 
-      - name: Deploy all extensions to all environments
+      - name: Deploy all extensions
         shell: powershell
         env:
           BC_USERNAME:  ${{ secrets.BC_USERNAME }}
           BC_PASSWORD:  ${{ secrets.BC_PASSWORD }}
           BC_TENANT_ID: 93e723e3-01e7-4e97-99cf-13ddd492ed98
+          TARGET_ENV:   ${{ inputs.environment }}
         run: |
           Write-Host "======================================================"
           Write-Host " Shelby BC Extensions - Deployment"
-          Write-Host " BC Version : ${{ inputs.bc_version }}"
-          Write-Host " Started    : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC"
+          Write-Host " BC Version  : ${{ inputs.bc_version }}"
+          Write-Host " Environment : $env:TARGET_ENV"
+          Write-Host " Started     : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC"
           Write-Host "======================================================"
 
           # Authenticate using M365 credentials
@@ -45,12 +51,21 @@ jobs:
                             (ConvertTo-SecureString $env:BC_PASSWORD -AsPlainText -Force)
                         ))
 
-          # Environments to deploy to
-          $envNames = @('DEV', 'AMA_HIST', 'AMA')
+          # Determine which environments to deploy to
+          if ($env:TARGET_ENV -eq 'ALL') {
+            $envNames = @('DEV', 'AMA_HIST', 'AMA')
+          } else {
+            $envNames = @($env:TARGET_ENV)
+          }
 
-          # Find all extension .app files in the repo
+          Write-Host "Deploying to: $($envNames -join ', ')"
+
+          # Find all extension .app files — skip .alpackages and .git folders
           $appFiles = Get-ChildItem -Path "." -Filter "*.app" -Recurse `
-                      | Where-Object { $_.FullName -notlike "*\.git*" -and $_.FullName -notlike "*.alpackages*" }
+                      | Where-Object {
+                          $_.FullName -notlike "*.alpackages*" -and
+                          $_.FullName -notlike "*.git*"
+                        }
 
           Write-Host "`nFound $($appFiles.Count) .app file(s):"
           $appFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
@@ -89,14 +104,15 @@ jobs:
           }
 
           # Write summary to GitHub Actions job summary
-          "## Shelby BC Extensions - Deployment Results"       | Out-File $env:GITHUB_STEP_SUMMARY
-          "**BC Version:** ${{ inputs.bc_version }}"           | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "## Shelby BC Extensions - Deployment Results"         | Out-File $env:GITHUB_STEP_SUMMARY
+          "**BC Version:** ${{ inputs.bc_version }}"             | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "**Environment:** $env:TARGET_ENV"                     | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "**Time:** $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          ""                                                   | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| Environment | Extension | Status |"              | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "|---|---|---|"                                      | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          ""                                                     | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Environment | Extension | Status |"                | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "|---|---|---|"                                        | Out-File $env:GITHUB_STEP_SUMMARY -Append
           $results | ForEach-Object {
-            "| $($_.Env) | $($_.App) | $($_.Status) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+            "| $($_.Env) | $($_.App) | $($_.Status) |"   | Out-File $env:GITHUB_STEP_SUMMARY -Append
           }
 
           if ($results | Where-Object { $_.Status -like "Failed*" }) { exit 1 }
