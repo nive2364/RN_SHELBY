@@ -28,6 +28,17 @@ jobs:
         run: |
           Install-Module BcContainerHelper -Force -AllowClobber -Scope CurrentUser
 
+      - name: Check BcContainerHelper version and parameters
+        shell: powershell
+        run: |
+          $module = Get-Module BcContainerHelper -ListAvailable | Select-Object -First 1
+          Write-Host "BcContainerHelper version: $($module.Version)"
+          $cmd = Get-Command Publish-BcContainerApp -ErrorAction SilentlyContinue
+          if ($cmd) {
+            Write-Host "Publish-BcContainerApp parameters:"
+            $cmd.Parameters.Keys | ForEach-Object { Write-Host "  - $_" }
+          }
+
       - name: Deploy all extensions
         shell: powershell
         env:
@@ -44,12 +55,16 @@ jobs:
           Write-Host "======================================================"
 
           # Authenticate using M365 credentials
+          $credential = New-Object System.Management.Automation.PSCredential(
+            $env:BC_USERNAME,
+            (ConvertTo-SecureString $env:BC_PASSWORD -AsPlainText -Force)
+          )
+
           $authContext = New-BcAuthContext `
             -tenantId   $env:BC_TENANT_ID `
-            -credential (New-Object System.Management.Automation.PSCredential(
-                            $env:BC_USERNAME,
-                            (ConvertTo-SecureString $env:BC_PASSWORD -AsPlainText -Force)
-                        ))
+            -credential $credential
+
+          Write-Host "Auth context created for tenant: $env:BC_TENANT_ID"
 
           # Determine which environments to deploy to
           if ($env:TARGET_ENV -eq 'ALL') {
@@ -60,7 +75,7 @@ jobs:
 
           Write-Host "Deploying to: $($envNames -join ', ')"
 
-          # Only look in the 4 named extension folders - ignore proj* folders and .alpackages
+          # Only look in the 4 named extension folders
           $validFolders = @(
             'Bill of Lading_Canyon Rim Consulting_1.5.0.0 (7)',
             'DefaultLocation_Canyon Rim Consulting_1.5.0.1',
@@ -87,12 +102,22 @@ jobs:
               Write-Host "`n  Deploying: $($appFile.Name)"
 
               try {
-                Publish-BcContainerApp `
-                  -authContext    $authContext `
-                  -environment    $envName `
-                  -appFile        $appFile.FullName `
-                  -useDevEndpoint $false `
-                  -syncMode       ForceSync
+                # Use bcAuthContext (newer BcContainerHelper) with fallback to authContext
+                $params = @{
+                  environment    = $envName
+                  appFile        = $appFile.FullName
+                  useDevEndpoint = $false
+                  syncMode       = 'ForceSync'
+                }
+
+                $cmd = Get-Command Publish-BcContainerApp
+                if ($cmd.Parameters.ContainsKey('bcAuthContext')) {
+                  $params['bcAuthContext'] = $authContext
+                } else {
+                  $params['authContext'] = $authContext
+                }
+
+                Publish-BcContainerApp @params
 
                 Write-Host "  Success: $($appFile.Name) -> $envName"
                 $results += [PSCustomObject]@{
@@ -109,7 +134,7 @@ jobs:
             }
           }
 
-          # Write summary to GitHub Actions job summary
+          # Write summary
           "## Shelby BC Extensions - Deployment Results"         | Out-File $env:GITHUB_STEP_SUMMARY
           "**BC Version:** ${{ inputs.bc_version }}"             | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "**Environment:** $env:TARGET_ENV"                     | Out-File $env:GITHUB_STEP_SUMMARY -Append
