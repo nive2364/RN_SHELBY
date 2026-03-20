@@ -60,14 +60,22 @@ jobs:
 
           Write-Host "Deploying to: $($envNames -join ', ')"
 
-          # Find all extension .app files — skip .alpackages and .git folders
-          $appFiles = Get-ChildItem -Path "." -Filter "*.app" -Recurse `
-                      | Where-Object {
-                          $_.FullName -notlike "*.alpackages*" -and
-                          $_.FullName -notlike "*.git*"
-                        }
+          # Only look in the 4 named extension folders - ignore proj* folders and .alpackages
+          $validFolders = @(
+            'Bill of Lading_Canyon Rim Consulting_1.5.0.0 (7)',
+            'DefaultLocation_Canyon Rim Consulting_1.5.0.1',
+            'Item Page Extension_Canyon Rim Consulting - Randy Nivert_1.5.0.0',
+            'Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)'
+          )
 
-          Write-Host "`nFound $($appFiles.Count) .app file(s):"
+          $appFiles = @()
+          foreach ($folder in $validFolders) {
+            $found = Get-ChildItem -Path $folder -Filter "*.app" -ErrorAction SilentlyContinue `
+                      | Where-Object { $_.FullName -notlike "*.alpackages*" }
+            if ($found) { $appFiles += $found }
+          }
+
+          Write-Host "`nFound $($appFiles.Count) .app file(s) to deploy:"
           $appFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
 
           $results = @()
@@ -84,9 +92,7 @@ jobs:
                   -environment    $envName `
                   -appFile        $appFile.FullName `
                   -useDevEndpoint $false `
-                  -syncMode       ForceSync `
-                  -install        $true `
-                  -upgrade        $true
+                  -syncMode       ForceSync
 
                 Write-Host "  Success: $($appFile.Name) -> $envName"
                 $results += [PSCustomObject]@{
