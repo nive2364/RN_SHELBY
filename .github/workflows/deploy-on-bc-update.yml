@@ -17,133 +17,117 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install BcContainerHelper
-        shell: powershell
-        run: |
-          Install-Module BcContainerHelper -Force -AllowClobber -Scope CurrentUser
-
-      - name: Check BcContainerHelper version and parameters
-        shell: powershell
-        run: |
-          $module = Get-Module BcContainerHelper -ListAvailable | Select-Object -First 1
-          Write-Host "BcContainerHelper version: $($module.Version)"
-          $cmd = Get-Command Publish-BcContainerApp -ErrorAction SilentlyContinue
-          if ($cmd) {
-            Write-Host "Publish-BcContainerApp parameters:"
-            $cmd.Parameters.Keys | ForEach-Object { Write-Host "  - $_" }
-          }
-
-      - name: Deploy all extensions
-        shell: powershell
+      - name: Deploy extensions via BC Admin API
+        shell: bash
         env:
           BC_USERNAME:  ${{ secrets.BC_USERNAME }}
           BC_PASSWORD:  ${{ secrets.BC_PASSWORD }}
           BC_TENANT_ID: 93e723e3-01e7-4e97-99cf-13ddd492ed98
           TARGET_ENV:   ${{ inputs.environment }}
         run: |
-          Write-Host "======================================================"
-          Write-Host " Shelby BC Extensions - Deployment"
-          Write-Host " BC Version  : ${{ inputs.bc_version }}"
-          Write-Host " Environment : $env:TARGET_ENV"
-          Write-Host " Started     : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC"
-          Write-Host "======================================================"
+          echo "======================================================"
+          echo " Shelby BC Extensions - Deployment"
+          echo " BC Version  : ${{ inputs.bc_version }}"
+          echo " Environment : $TARGET_ENV"
+          echo " Started     : $(date -u)"
+          echo "======================================================"
 
-          # Authenticate using M365 credentials
-          $credential = New-Object System.Management.Automation.PSCredential(
-            $env:BC_USERNAME,
-            (ConvertTo-SecureString $env:BC_PASSWORD -AsPlainText -Force)
+          # Step 1: Get access token using the BC Admin Center app ID
+          BC_ADMIN_APP_ID="996def3d-b36c-4153-8607-a6fd3c01b89f"
+
+          echo "Authenticating..."
+          TOKEN_RESPONSE=$(curl -s -X POST \
+            "https://login.microsoftonline.com/${BC_TENANT_ID}/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=password" \
+            -d "client_id=${BC_ADMIN_APP_ID}" \
+            -d "username=${BC_USERNAME}" \
+            -d "password=${BC_PASSWORD}" \
+            -d "scope=https://api.businesscentral.dynamics.com/.default")
+
+          TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "ERROR: Authentication failed."
+            echo "Response: $TOKEN_RESPONSE"
+            exit 1
+          fi
+
+          echo "Authentication successful."
+
+          # Step 2: Determine environments
+          if [ "$TARGET_ENV" = "ALL" ]; then
+            ENVS="DEV AMA_HIST AMA"
+          else
+            ENVS="$TARGET_ENV"
+          fi
+
+          # Step 3: Define the 4 app files with their folder paths
+          declare -A APP_FILES=(
+            ["Bill of Lading"]="Bill of Lading_Canyon Rim Consulting_1.5.0.0 (7)/Canyon Rim Consulting_Bill of Lading_1.5.0.0.app"
+            ["DefaultLocation"]="DefaultLocation_Canyon Rim Consulting_1.5.0.1/Canyon Rim Consulting_DefaultLocation_1.5.0.2.app"
+            ["Item Page Extension"]="Item Page Extension_Canyon Rim Consulting - Randy Nivert_1.5.0.0/Canyon Rim Consulting - Randy Nivert_Item Page Extension_1.5.0.0.app"
+            ["Shelby Inventory Detail"]="Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)/Canyon Rim Consultiong_Shelby Inventory Detail_1.0.0.0.app"
           )
 
-          $authContext = New-BcAuthContext `
-            -tenantId   $env:BC_TENANT_ID `
-            -credential $credential
+          BASE="https://api.businesscentral.dynamics.com/v2.0/${BC_TENANT_ID}/admin/v2.21/applications/BusinessCentral/environments"
 
-          Write-Host "Auth context created for tenant: $env:BC_TENANT_ID"
+          RESULTS=""
 
-          # Determine which environments to deploy to
-          if ($env:TARGET_ENV -eq 'ALL') {
-            $envNames = @('DEV', 'AMA_HIST', 'AMA')
-          } else {
-            $envNames = @($env:TARGET_ENV)
-          }
+          for ENV_NAME in $ENVS; do
+            echo ""
+            echo "====== Deploying to: $ENV_NAME ======"
 
-          Write-Host "Deploying to: $($envNames -join ', ')"
+            for APP_NAME in "${!APP_FILES[@]}"; do
+              APP_PATH="${APP_FILES[$APP_NAME]}"
 
-          # Only look in the 4 named extension folders
-          $validFolders = @(
-            'Bill of Lading_Canyon Rim Consulting_1.5.0.0 (7)',
-            'DefaultLocation_Canyon Rim Consulting_1.5.0.1',
-            'Item Page Extension_Canyon Rim Consulting - Randy Nivert_1.5.0.0',
-            'Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)'
-          )
+              if [ ! -f "$APP_PATH" ]; then
+                echo "  SKIPPED: $APP_NAME - file not found at $APP_PATH"
+                RESULTS+="$ENV_NAME|$APP_NAME|Skipped - file not found\n"
+                continue
+              fi
 
-          $appFiles = @()
-          foreach ($folder in $validFolders) {
-            $found = Get-ChildItem -Path $folder -Filter "*.app" -ErrorAction SilentlyContinue `
-                      | Where-Object { $_.FullName -notlike "*.alpackages*" }
-            if ($found) { $appFiles += $found }
-          }
+              echo "  Deploying: $APP_NAME"
 
-          Write-Host "`nFound $($appFiles.Count) .app file(s) to deploy:"
-          $appFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+              # Upload the .app file to BC environment
+              HTTP_STATUS=$(curl -s -o /tmp/deploy_response.json -w "%{http_code}" \
+                -X POST "$BASE/$ENV_NAME/apps" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@$APP_PATH")
 
-          $results = @()
+              RESPONSE=$(cat /tmp/deploy_response.json)
 
-          foreach ($envName in $envNames) {
-            Write-Host "`n====== Deploying to: $envName ======"
-
-            foreach ($appFile in $appFiles) {
-              Write-Host "`n  Deploying: $($appFile.Name)"
-
-              try {
-                # Use bcAuthContext (newer BcContainerHelper) with fallback to authContext
-                $params = @{
-                  environment    = $envName
-                  appFile        = $appFile.FullName
-                  useDevEndpoint = $false
-                  syncMode       = 'ForceSync'
-                }
-
-                $cmd = Get-Command Publish-BcContainerApp
-                if ($cmd.Parameters.ContainsKey('bcAuthContext')) {
-                  $params['bcAuthContext'] = $authContext
-                } else {
-                  $params['authContext'] = $authContext
-                }
-
-                Publish-BcContainerApp @params
-
-                Write-Host "  Success: $($appFile.Name) -> $envName"
-                $results += [PSCustomObject]@{
-                  Env = $envName; App = $appFile.BaseName; Status = "Success"
-                }
-              } catch {
-                $errMsg = $_.Exception.Message
-                Write-Warning "  FAILED: $($appFile.Name) -> $envName"
-                Write-Warning "  Error: $errMsg"
-                $results += [PSCustomObject]@{
-                  Env = $envName; App = $appFile.BaseName; Status = "Failed: $errMsg"
-                }
-              }
-            }
-          }
+              if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ] || [ "$HTTP_STATUS" = "202" ]; then
+                echo "  Success: $APP_NAME -> $ENV_NAME (HTTP $HTTP_STATUS)"
+                RESULTS+="$ENV_NAME|$APP_NAME|Success\n"
+              else
+                echo "  FAILED: $APP_NAME -> $ENV_NAME (HTTP $HTTP_STATUS)"
+                echo "  Response: $RESPONSE"
+                RESULTS+="$ENV_NAME|$APP_NAME|Failed: HTTP $HTTP_STATUS - $(echo $RESPONSE | jq -r '.message // .error // .')\n"
+              fi
+            done
+          done
 
           # Write summary
-          "## Shelby BC Extensions - Deployment Results"         | Out-File $env:GITHUB_STEP_SUMMARY
-          "**BC Version:** ${{ inputs.bc_version }}"             | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "**Environment:** $env:TARGET_ENV"                     | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "**Time:** $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          ""                                                     | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| Environment | Extension | Status |"                | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "|---|---|---|"                                        | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          $results | ForEach-Object {
-            "| $($_.Env) | $($_.App) | $($_.Status) |"   | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          }
+          echo "## Shelby BC Extensions - Deployment Results" >> $GITHUB_STEP_SUMMARY
+          echo "**BC Version:** ${{ inputs.bc_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $TARGET_ENV" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u '+%Y-%m-%d %H:%M') UTC" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Extension | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo -e "$RESULTS" | while IFS='|' read -r env app status; do
+            [ -n "$env" ] && echo "| $env | $app | $status |" >> $GITHUB_STEP_SUMMARY
+          done
 
-          if ($results | Where-Object { $_.Status -like "Failed*" }) { exit 1 }
+          # Fail if any failed
+          if echo -e "$RESULTS" | grep -q "Failed:"; then
+            exit 1
+          fi
