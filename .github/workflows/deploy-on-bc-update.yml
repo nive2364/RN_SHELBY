@@ -37,7 +37,7 @@ jobs:
           Write-Host " Started    : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC"
           Write-Host "======================================================"
 
-          # Authenticate using M365 credentials (no admin consent needed)
+          # Authenticate using M365 credentials
           $authContext = New-BcAuthContext `
             -tenantId   $env:BC_TENANT_ID `
             -credential (New-Object System.Management.Automation.PSCredential(
@@ -45,94 +45,58 @@ jobs:
                             (ConvertTo-SecureString $env:BC_PASSWORD -AsPlainText -Force)
                         ))
 
-          # Environments to deploy to - matches your launch.json
+          # Environments to deploy to
           $envNames = @('DEV', 'AMA_HIST', 'AMA')
 
-          # Find all extension projects by locating every app.json in the repo
-          $projects = Get-ChildItem -Path "." -Filter "app.json" -Recurse `
-                      | Where-Object { $_.FullName -notlike "*\.git\*" }
+          # Find all extension .app files in the repo
+          $appFiles = Get-ChildItem -Path "." -Filter "*.app" -Recurse `
+                      | Where-Object { $_.FullName -notlike "*\.git*" -and $_.FullName -notlike "*.alpackages*" }
 
-          Write-Host "`nFound $($projects.Count) extension project(s):"
-          $projects | ForEach-Object { Write-Host "  -> $($_.DirectoryName)" }
+          Write-Host "`nFound $($appFiles.Count) .app file(s):"
+          $appFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
 
           $results = @()
 
           foreach ($envName in $envNames) {
             Write-Host "`n====== Deploying to: $envName ======"
 
-            foreach ($project in $projects) {
-              $projectDir = $project.DirectoryName
-              $appJson    = Get-Content $project.FullName | ConvertFrom-Json
-              $appName    = $appJson.name
-              $appVersion = $appJson.version
-
-              Write-Host "`n  App: $appName v$appVersion"
-
-              # Find compiled .app file in project folder
-              $appFile = Get-ChildItem -Path $projectDir -Filter "*.app" -Recurse `
-                         | Select-Object -First 1
-
-              if (-not $appFile) {
-                Write-Warning "  No .app file found in $projectDir - skipping"
-                $results += [PSCustomObject]@{
-                  Env     = $envName
-                  App     = $appName
-                  Version = $appVersion
-                  Status  = "Skipped - no .app file"
-                }
-                continue
-              }
+            foreach ($appFile in $appFiles) {
+              Write-Host "`n  Deploying: $($appFile.Name)"
 
               try {
                 Publish-BcContainerApp `
-                  -authContext           $authContext `
-                  -environment           $envName `
-                  -appFile               $appFile.FullName `
-                  -useDevEndpoint        $false `
-                  -checkAlreadyInstalled $true
+                  -authContext    $authContext `
+                  -environment    $envName `
+                  -appFile        $appFile.FullName `
+                  -useDevEndpoint $false `
+                  -syncMode       ForceSync `
+                  -install        $true `
+                  -upgrade        $true
 
-                Write-Host "  SUCCESS: $appName -> $envName"
+                Write-Host "  Success: $($appFile.Name) -> $envName"
                 $results += [PSCustomObject]@{
-                  Env     = $envName
-                  App     = $appName
-                  Version = $appVersion
-                  Status  = "Success"
+                  Env = $envName; App = $appFile.BaseName; Status = "Success"
                 }
               } catch {
-                Write-Warning "  FAILED: $appName -> $envName"
-                Write-Warning "  Error: $($_.Exception.Message)"
+                $errMsg = $_.Exception.Message
+                Write-Warning "  FAILED: $($appFile.Name) -> $envName"
+                Write-Warning "  Error: $errMsg"
                 $results += [PSCustomObject]@{
-                  Env     = $envName
-                  App     = $appName
-                  Version = $appVersion
-                  Status  = "Failed: $($_.Exception.Message)"
+                  Env = $envName; App = $appFile.BaseName; Status = "Failed: $errMsg"
                 }
               }
             }
           }
 
-          # Print summary
-          Write-Host "`n======================================================"
-          Write-Host " Deployment Summary"
-          Write-Host "======================================================"
+          # Write summary to GitHub Actions job summary
+          "## Shelby BC Extensions - Deployment Results"       | Out-File $env:GITHUB_STEP_SUMMARY
+          "**BC Version:** ${{ inputs.bc_version }}"           | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "**Time:** $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          ""                                                   | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Environment | Extension | Status |"              | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "|---|---|---|"                                      | Out-File $env:GITHUB_STEP_SUMMARY -Append
           $results | ForEach-Object {
-            Write-Host "  $($_.Env) | $($_.App) v$($_.Version) | $($_.Status)"
+            "| $($_.Env) | $($_.App) | $($_.Status) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           }
 
-          # Write GitHub Actions job summary (visible in Actions UI)
-          "## Shelby BC Extension Deployment" | Out-File $env:GITHUB_STEP_SUMMARY
-          "**BC Version:** ${{ inputs.bc_version }}" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "**Deployed:** $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| Environment | Extension | Version | Status |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "|---|---|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          $results | ForEach-Object {
-            "| $($_.Env) | $($_.App) | $($_.Version) | $($_.Status) |" `
-              | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          }
-
-          # Fail job if any deployment failed
-          if ($results | Where-Object { $_.Status -like "Failed*" }) {
-            Write-Error "One or more deployments failed. Check the summary above."
-            exit 1
-          }
+          if ($results | Where-Object { $_.Status -like "Failed*" }) { exit 1 }
