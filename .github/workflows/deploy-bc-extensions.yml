@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false # one extension failing shouldn't cancel the others
+      max-parallel: 1 # BC only allows one pending extensionUpload per company; run extensions one at a time
       matrix:
         include:
           - name: "Bill of Lading"
