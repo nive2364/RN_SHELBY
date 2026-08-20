@@ -17,7 +17,59 @@ env:
   BC_ENVIRONMENT: ${{ github.event.client_payload.environment || inputs.environment }}
 
 jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo (need Bill of Lading's .app file to finish a stuck record, if one exists)
+        uses: actions/checkout@v4
+
+      - name: Get BC access token
+        id: token
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            "https://login.microsoftonline.com/${{ env.BC_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.BC_CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.BC_CLIENT_SECRET }}" \
+            -d "scope=https://api.businesscentral.dynamics.com/.default" \
+            -d "grant_type=client_credentials")
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Determine company ID for this environment
+        id: company
+        run: |
+          if [ "${{ env.BC_ENVIRONMENT }}" == "Production" ]; then
+            echo "companyId=e5fd0ac1-b3d3-ee11-904f-6045bdac9aed" >> "$GITHUB_OUTPUT"
+          else
+            echo "companyId=9b3d9592-1b7a-ef11-ac30-7c1e523f8000" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for and clear a stale pending upload record
+        run: |
+          ENV_ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "${{ env.BC_ENVIRONMENT }}")
+          LIST=$(curl -s -X GET \
+            "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
+          STALE_ID=$(echo "$LIST" | jq -r '.value[0].systemId // empty')
+          if [ -n "$STALE_ID" ]; then
+            echo "Found stale pending record $STALE_ID — clearing it with Bill of Lading's content."
+            curl -s -X PATCH \
+              "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload($STALE_ID)/extensionContent" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/octet-stream" \
+              -H "If-Match: *" \
+              --data-binary "@projBillofLading-main/Canyon Rim Consulting_projBillofLading_1.5.0.0.app"
+            curl -s -X POST \
+              "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload($STALE_ID)/Microsoft.NAV.upload" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}"
+            echo "Cleared."
+          else
+            echo "No stale record found — nothing to clean up."
+          fi
+
   deploy:
+    needs: cleanup
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false # one extension failing shouldn't cancel the others
