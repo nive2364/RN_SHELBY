@@ -186,8 +186,12 @@ codeunit 50216 "Item Ledger Entry Helper"
     var
         ItemLedgerEntryToUpdate: Record "Item Ledger Entry";
     begin
-        // Use elevated permissions to modify Item Ledger Entry
-        ItemLedgerEntryToUpdate := ItemLedgerEntry;
+        // Re-read the record fresh from DB to avoid DB:RecordChanged error
+        // when called during operations like Undo Shipment that touch the
+        // record multiple times in the same transaction
+        if not ItemLedgerEntryToUpdate.Get(ItemLedgerEntry."Entry No.") then
+            exit(false);
+
         ItemLedgerEntryToUpdate."Historical No." := Item."Historical No.";
         ItemLedgerEntryToUpdate."Vendor Description" := Item."Vendor Description";
         ItemLedgerEntryToUpdate."Shelby No." := Item."Shelby No.";
@@ -195,7 +199,6 @@ codeunit 50216 "Item Ledger Entry Helper"
         ItemLedgerEntryToUpdate."Historical PN" := Item."Historical PN";
         ItemLedgerEntryToUpdate."Historical Description" := Item."Historical Description";
 
-        // Modify with elevated permissions
         if ItemLedgerEntryToUpdate.Modify(true) then begin
             ItemLedgerEntry := ItemLedgerEntryToUpdate;
             exit(true);

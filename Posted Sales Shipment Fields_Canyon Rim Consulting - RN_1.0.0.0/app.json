@@ -1,0 +1,40 @@
+{
+  "id": "4fd7b0ce-8dea-4aa6-9ec4-0855cd3bf1e8",
+  "name": "Posted Sales Shipment Fields",
+  "publisher": "Canyon Rim Consulting - RN",
+  "version": "1.0.0.0",
+  "runtime": "16.0",
+  "target": "Cloud",
+  "application": "27.4.0.0",
+  "platform": "27.0.52498.0",
+  "resourceExposurePolicy": {
+    "allowDebugging": true,
+    "allowDownloadingSource": true,
+    "includeSourceInSymbolFile": true,
+    "applyToDevExtension": false
+  },
+  "features": [
+    "NOIMPLICITWITH"
+  ],
+  "dependencies": [
+    {
+      "id": "437dbf0e-84ff-417a-965d-ed2bb9650972",
+      "name": "Base Application",
+      "version": "27.4.0.0",
+      "publisher": "Microsoft"
+    },
+    {
+      "id": "7a5bb24a-7b5b-4b79-9987-5c7460c17d31",
+      "name": "Bill of Lading",
+      "version": "1.5.0.0",
+      "publisher": "Canyon Rim Consulting"
+    }
+  ],
+  "idRanges": [
+    {
+      "from": 50100,
+      "to": 50149
+    }
+  ],
+ 
+}

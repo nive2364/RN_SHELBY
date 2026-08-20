@@ -5,6 +5,6 @@ permissionset 50210 "Item Card Extension"
 
     Permissions =
         tabledata "Item Ledger Entry" = M,
-        tabledata Item = RIMD;
+        tabledata Item = RIMD,
+        codeunit "Item Ledger Entry Helper" = X;
 }
-
