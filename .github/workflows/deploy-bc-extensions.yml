@@ -72,7 +72,8 @@ jobs:
           fi
           INSTALL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload($STALE_ID)/Microsoft.NAV.upload" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -d '')
           echo "Install status: $INSTALL_STATUS"
 
   deploy:
@@ -185,7 +186,8 @@ jobs:
           ENV_ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "${{ env.BC_ENVIRONMENT }}")
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload(${{ steps.create.outputs.systemId }})/Microsoft.NAV.upload" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}")
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -d '')
           echo "Install trigger status: $STATUS"
 
       - name: Wait for install to actually finish
