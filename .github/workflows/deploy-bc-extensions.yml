@@ -82,8 +82,11 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
+     matrix:
         include:
+          - name: "Shelby Inventory Detail"
+            appId: "a7e266bb-bff4-4cd5-8e52-981dcd5d888f"
+            appPath: "projInventoryTransactionDetail-main/Canyon Rim Consulting_Shelby Inventory Detail_1.0.0.0.app"
           - name: "Bill of Lading"
             appId: "7a5bb24a-7b5b-4b79-9987-5c7460c17d31"
             appPath: "projBillofLading-main/Canyon Rim Consulting_projBillofLading_1.5.0.0.app"
@@ -93,9 +96,6 @@ jobs:
           - name: "Item Page Extension"
             appId: "7a5bb24a-7b5b-4b79-9987-5c7460c17d37"
             appPath: "Item Page Extension_Canyon Rim Consulting - Randy Nivert_1.5.0.0/Canyon Rim Consulting - Randy Nivert_Item Page Extension_1.5.0.0.app"
-          - name: "Shelby Inventory Detail"
-            appId: "a7e266bb-bff4-4cd5-8e52-981dcd5d888f"
-            appPath: "Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)/Canyon Rim Consultiong_Shelby Inventory Detail_1.0.0.0.app"
           - name: "Posted Sales Shipment Fields"
             appId: "4fd7b0ce-8dea-4aa6-9ec4-0855cd3bf1e8"
             appPath: "Posted Sales Shipment Fields_Canyon Rim Consulting - RN_1.0.0.0/Canyon Rim Consulting - RN_Posted Sales Shipment Fields_1.0.0.0.app"
