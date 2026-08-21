@@ -89,7 +89,7 @@ jobs:
             appPath: "Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)/Canyon Rim Consultiong_Shelby Inventory Detail_1.0.0.0.app"
           - name: "Bill of Lading"
             appId: "7a5bb24a-7b5b-4b79-9987-5c7460c17d31"
-            appPath: "projBillofLading-main/Canyon Rim Consulting_projBillofLading_1.5.0.0.app"
+            appPath: "projBillofLading-main/Canyon Rim Consulting-RN-PFC_Bill of Lading_1.5.0.0.app"
           - name: "DefaultLocation"
             appId: "87064380-af52-47ab-9167-c06796aef4b9"
             appPath: "DefaultLocation_Canyon Rim Consulting_1.5.0.1/Canyon Rim Consulting_DefaultLocation_1.5.0.2.app"
