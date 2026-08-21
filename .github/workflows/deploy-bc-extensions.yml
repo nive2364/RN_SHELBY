@@ -58,13 +58,13 @@ jobs:
             echo "Pending record $STALE_ID still present, waiting 15s... (attempt $i/20)"
             sleep 15
           done
-          echo "Still stuck after 5 minutes — force-clearing with Bill of Lading's content."
+          echo "Still stuck after 5 minutes — force-clearing with Shelby Inventory Detail's content."
           PATCH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
             "https://api.businesscentral.dynamics.com/v2.0/${{ env.BC_TENANT_ID }}/$ENV_ENCODED/api/microsoft/automation/v2.0/companies(${{ steps.company.outputs.companyId }})/extensionUpload($STALE_ID)/extensionContent" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
             -H "Content-Type: application/octet-stream" \
             -H "If-Match: *" \
-            -T "projBillofLading-main/Canyon Rim Consulting_projBillofLading_1.5.0.0.app")
+            -T "projInventoryTransactionDetail-main/Canyon Rim Consulting_Shelby Inventory Detail_1.0.0.0.app")
           echo "PATCH status: $PATCH_STATUS"
           if [ "$PATCH_STATUS" != "204" ] && [ "$PATCH_STATUS" != "200" ]; then
             echo "::error::PATCH failed with status $PATCH_STATUS"
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-     matrix:
+      matrix:
         include:
           - name: "Shelby Inventory Detail"
             appId: "a7e266bb-bff4-4cd5-8e52-981dcd5d888f"
