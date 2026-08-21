@@ -1,30 +1,32 @@
 {
-  "id": "a7e266bb-bff4-4cd5-8e52-981dcd5d888f",
-  "name": "Shelby Inventory Detail",
-  "publisher": "Canyon Rim Consultiong",
-  "version": "1.0.0.1",
-  "runtime": "13.0",
-  "target": "Cloud",
-  "application": "24.0.0.0",
-  "platform": "26.0.44919.0",
-  "resourceExposurePolicy": {
-    "allowDebugging": true,
-    "allowDownloadingSource": true,
-    "includeSourceInSymbolFile": true,
-    "applyToDevExtension": false
-  },
-  "features": [
-    "NOIMPLICITWITH"
-  ],
-  "idRanges": [
-    {
-      "from": 50100,
-      "to": 50149
-    }
-  ],
-  "build": {
-    "by": "AL Language Extension,16.2.1869542",
-    "timestamp": "2025-12-30T14:19:00.7160800+00:00",
-    "compilerVersion": "16.2.28.34590"
-  }
+    "id": "7a5bb24a-7b5b-4b79-9987-5c7460c17d31",
+    "name": "Bill of Lading",
+    "publisher": "Canyon Rim Consulting-RN-PFC",
+    "version": "1.5.0.1",
+    "brief": "",
+    "description": "",
+    "privacyStatement": "",
+    "EULA": "",
+    "help": "",
+    "url": "",
+    "logo": "",
+    "dependencies": [],
+    "screenshots": [],
+    "platform": "1.0.0.0",
+    "application": "24.2.20227.20460",
+    "idRanges": [
+        {
+            "from": 50100,
+            "to": 50149
+        }
+    ],
+    "resourceExposurePolicy": {
+        "allowDebugging": true,
+        "allowDownloadingSource": true,
+        "includeSourceInSymbolFile": true
+    },
+    "runtime": "13.0",
+    "features": [
+        "NoImplicitWith"
+    ]
 }
