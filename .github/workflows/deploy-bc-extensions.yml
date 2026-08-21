@@ -86,7 +86,7 @@ jobs:
         include:
           - name: "Shelby Inventory Detail"
             appId: "a7e266bb-bff4-4cd5-8e52-981dcd5d888f"
-            appPath: "projInventoryTransactionDetail/Canyon Rim Consulting - RN - PFC_Shelby Inventory Detail_1.0.0.1.app"
+            appPath: "Shelby Inventory Detail_Canyon Rim Consultiong_1.0.0.1 (1)/Canyon Rim Consultiong_Shelby Inventory Detail_1.0.0.0.app"
           - name: "Bill of Lading"
             appId: "7a5bb24a-7b5b-4b79-9987-5c7460c17d31"
             appPath: "projBillofLading-main/Canyon Rim Consulting_projBillofLading_1.5.0.0.app"
@@ -235,7 +235,7 @@ jobs:
                   \"content\": \"Extension deployment to ${{ env.BC_ENVIRONMENT }} finished with status: $RESULT.\n\nSee the full run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
                 },
                 \"toRecipients\": [
-                  { \"emailAddress\": { \"address\": \"${{ secrets.NOTIFY_RECIPIENT }}\" } }
+                  { \"emailAddress\": { \"address\": \"rnivert@canyonrimconsulting.com\" } }
                 ]
               }
             }"
